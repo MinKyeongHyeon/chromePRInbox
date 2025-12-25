@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>PR Inbox — Privacy Policy</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial; max-width: 780px; margin: 40px auto; color: #111; line-height:1.5; padding: 0 16px }
+      h1,h2{ color:#222 }
+      footer{ margin-top:28px; font-size:13px; color:#555 }
+      a{ color:#0366d6 }
+    </style>
+  </head>
+  <body>
+    <h1>Privacy Policy — PR Inbox</h1>
+    <p>Last updated: 2025-12-26</p>
+
+    <h2>Summary</h2>
+    <p>
+      PR Inbox uses your GitHub token only to query GitHub APIs for unread
+      pull request notifications and related metadata. The token and any
+      other data used by the extension (settings, cached metadata,
+      snooze/pin state) are stored locally in your browser using
+      <code>chrome.storage</code> and are never transmitted to external
+      servers or third parties.
+    </p>
+
+    <h2>Data We Collect and Store</h2>
+    <ul>
+      <li>
+        <strong>GitHub token</strong> — Provided directly by the user via the
+        extension Options. Stored in <code>chrome.storage.sync</code> to
+        persist across the user's Chrome profile devices (if sync is
+        enabled).
+      </li>
+      <li>
+        <strong>User preferences</strong> — UI language, filters, auto-refresh
+        interval, theme, and similar settings (stored locally to keep
+        a consistent experience).
+      </li>
+      <li>
+        <strong>Runtime cache and state</strong> — Cached PR metadata,
+        seen/seen-pr lists, snooze and pinned PR state, and small caches to
+        reduce API requests. These are stored locally and expire based on
+        the extension's caching rules.
+      </li>
+    </ul>
+
+    <h2>How We Use the Data</h2>
+    <p>
+      The data is used solely to provide the extension's functionality:
+      to query GitHub for the user's unread PR notifications, display them
+      in the popup, allow filtering, pinning, and snoozing behavior, and
+      to show local reminders when a snooze expires. No data is used for
+      advertising, profiling, or shared with third parties.
+    </p>
+
+    <h2>Remote Code and External Requests</h2>
+    <p>
+      PR Inbox does not download or execute remote scripts. The
+      extension's executable code is included in the distributed package.
+      Network requests are limited to calls to the GitHub API (
+      <code>https://api.github.com/*</code>) for the explicit purpose of
+      retrieving PR and notification data.
+    </p>
+
+    <h2>Permissions</h2>
+    <ul>
+      <li><strong>Host permission</strong> (<code>https://api.github.com/*</code>): required to call GitHub APIs.</li>
+      <li><strong>storage</strong>: to store token and user settings locally.</li>
+      <li><strong>alarms</strong>: to schedule local snooze expirations and optional refreshes.</li>
+      <li><strong>notifications</strong>: to show local desktop notifications when snoozes expire or notable updates occur.</li>
+    </ul>
+
+    <h2>User Controls</h2>
+    <p>
+      Users can remove or replace their GitHub token at any time from the
+      extension Options page. Deleting the token prevents further API
+      calls. Users may also clear other stored data (filters, snoozes,
+      pinned items, caches) using the Options page.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      For privacy questions or requests, contact: <a href="mailto:developer@example.com">developer@example.com</a>
+    </p>
+
+    <footer>
+      This privacy policy is intended for the Chrome Web Store listing and
+      for end users. If you need an exportable machine-readable policy or
+      a different format, contact the developer at the email above.
+    </footer>
+  </body>
+</html>
