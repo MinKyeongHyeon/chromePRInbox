@@ -579,6 +579,28 @@ chrome.storage.sync.get(["githubToken"], async (res) => {
         } catch (e) {
           console.warn("fetch authored PRs failed", e);
         }
+        // 추가: review-requested 및 assignee PR도 항상 합칩니다 (중복 제거)
+        try {
+          const ar = await fetchAssignedAndReviewPRs(token, user.login);
+          if (ar && ar.length > 0) {
+            const urls = new Set(items.map((i) => i.html_url));
+            // insert review/assigned items after authored ones
+            for (const r of ar) {
+              if (!urls.has(r.html_url)) {
+                items.unshift(r);
+                urls.add(r.html_url);
+              }
+            }
+            // reflect candidates
+            prCandidateCount = prCandidateCount || ar.length;
+            console.info(
+              "Assigned/Review PRs added:",
+              ar.map((x) => x.html_url)
+            );
+          }
+        } catch (e) {
+          console.warn("fetchAssignedAndReviewPRs failed", e);
+        }
         // if authored search returned none, add hint for scopes (user might have private PRs)
         // (this will be used below when showing empty states)
         let authoredHint = null;
@@ -705,6 +727,66 @@ chrome.storage.sync.get(["githubToken"], async (res) => {
             }));
           } catch (e) {
             console.warn("fetchGraphQLPRs error", e);
+            return [];
+          }
+        }
+
+        // REST 기반으로 review-requested 및 assignee PR을 가져옵니다
+        async function fetchAssignedAndReviewPRs(token, login) {
+          if (!login) return [];
+          try {
+            const results = [];
+            // helper to run search and map
+            async function runSearch(q, reason) {
+              const url = `https://api.github.com/search/issues?q=${encodeURIComponent(
+                q
+              )}&per_page=50`;
+              const res = await fetch(url, {
+                headers: {
+                  Authorization: `token ${token}`,
+                  Accept: "application/vnd.github+json",
+                },
+              });
+              if (!res.ok) return [];
+              const j = await res.json();
+              return (j.items || []).map((it) => {
+                const repoMatch = it.repository_url
+                  ? it.repository_url.replace(
+                      "https://api.github.com/repos/",
+                      ""
+                    )
+                  : "";
+                return {
+                  title: it.title,
+                  html_url: it.html_url,
+                  repo_full_name: repoMatch,
+                  reason,
+                  thread_id: null,
+                  number: it.number,
+                  user: it.user && it.user.login,
+                  updated_at: it.updated_at,
+                  subject_url: it.url,
+                };
+              });
+            }
+
+            const reviewQ = `is:pr is:open review-requested:${login}`;
+            const assignQ = `is:pr is:open assignee:${login}`;
+            const [reviewed, assigned] = await Promise.all([
+              runSearch(reviewQ, "review_requested"),
+              runSearch(assignQ, "assignee"),
+            ]);
+            // merge and dedupe by html_url
+            const seen = new Set();
+            for (const r of reviewed.concat(assigned)) {
+              if (!r.html_url) continue;
+              if (seen.has(r.html_url)) continue;
+              seen.add(r.html_url);
+              results.push(r);
+            }
+            return results;
+          } catch (e) {
+            console.warn("fetchAssignedAndReviewPRs error", e);
             return [];
           }
         }

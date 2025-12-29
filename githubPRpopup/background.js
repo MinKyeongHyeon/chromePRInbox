@@ -87,11 +87,18 @@ async function scheduleAlarmsForSnoozes() {
 
 chrome.runtime.onInstalled.addListener(() => {
   scheduleAlarmsForSnoozes();
+  // start periodic poll for incoming review requests / assignments
+  try {
+    chrome.alarms.create("poll_prs", { periodInMinutes: 5 });
+  } catch (e) {}
   updateBadge();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   scheduleAlarmsForSnoozes();
+  try {
+    chrome.alarms.create("poll_prs", { periodInMinutes: 5 });
+  } catch (e) {}
   updateBadge();
 });
 
@@ -157,10 +164,112 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         } catch (e) {}
       }
     }
+    // periodic poll for review requests / assignments
+    if (alarm.name === "poll_prs") {
+      try {
+        await pollForAssignedOrReviewRequests();
+      } catch (e) {
+        console.warn("poll_prs handler failed", e);
+      }
+    }
   } catch (e) {
     console.warn("onAlarm handler failed", e);
   }
 });
+
+// Poll GitHub for PRs where the user is review-requested or assignee,
+// and create notifications for newly discovered items.
+async function pollForAssignedOrReviewRequests() {
+  try {
+    const sync = await new Promise((r) =>
+      chrome.storage.sync.get(["githubToken"], (s) => r(s || {}))
+    );
+    const token = sync.githubToken;
+    if (!token) return;
+
+    // get user login
+    let user = null;
+    try {
+      const res = await fetch("https://api.github.com/user", {
+        headers: {
+          Authorization: `token ${token}`,
+          Accept: "application/vnd.github+json",
+        },
+      });
+      if (!res.ok) return;
+      user = await res.json();
+    } catch (e) {
+      return;
+    }
+    const login = user && user.login;
+    if (!login) return;
+
+    const q = `is:pr is:open (review-requested:${login} OR assignee:${login})`;
+    const url = `https://api.github.com/search/issues?q=${encodeURIComponent(
+      q
+    )}&per_page=50`;
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/vnd.github+json",
+      },
+    });
+    if (!res.ok) return;
+    const j = await res.json();
+    const items = (j.items || []).map((it) => ({
+      title: it.title,
+      html_url: it.html_url,
+      repo_full_name: it.repository_url
+        ? it.repository_url.replace("https://api.github.com/repos/", "")
+        : "",
+      number: it.number,
+    }));
+
+    // load notified and snoozed state
+    const s = await new Promise((r) =>
+      chrome.storage.local.get(["notifiedPRs", "snoozedPRs"], (v) => r(v || {}))
+    );
+    const notified = new Set(s.notifiedPRs || []);
+    const snoozed = s.snoozedPRs || {};
+    const now = Date.now();
+    let changed = false;
+    for (const it of items) {
+      const key = it.html_url || `${it.repo_full_name}#${it.number}`;
+      // skip if snoozed
+      const sno = snoozed[key];
+      if (sno && sno.until && now < sno.until) continue;
+      if (notified.has(key)) continue;
+
+      // create notification
+      const notifId = "auto-" + Math.random().toString(36).slice(2, 9);
+      if (it.html_url) _notifMap[notifId] = it.html_url;
+      const title = it.title || "새 PR 알림";
+      const message = `${it.repo_full_name} · #${it.number} — 리뷰 요청/배정됨`;
+      try {
+        chrome.notifications.create(
+          notifId,
+          { type: "basic", iconUrl: "icon.png", title, message, priority: 2 },
+          () => {}
+        );
+      } catch (e) {}
+
+      notified.add(key);
+      changed = true;
+    }
+
+    if (changed) {
+      chrome.storage.local.set({ notifiedPRs: Array.from(notified) });
+      try {
+        chrome.runtime.sendMessage({ type: "reloadPRs" });
+      } catch (e) {}
+      try {
+        await updateBadge();
+      } catch (e) {}
+    }
+  } catch (e) {
+    console.warn("pollForAssignedOrReviewRequests failed", e);
+  }
+}
 
 // update badge periodically as a fallback
 setInterval(updateBadge, 1000 * 60);
